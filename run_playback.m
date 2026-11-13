@@ -5,19 +5,31 @@ function varargout = run_playback(speed, animate)
 %   run_playback(2)            twice as fast
 %   run_playback(1, false)     print the summary and skip the animation
 %
-%   MATLAB Online, from this folder (setup_paths clones the two source
-%   repos if they are not already under /MATLAB Drive/Repositories):
+%   MATLAB Online, from this folder, after a git checkout or git pull
+%   done with !git (those files are invisible until the path is refreshed):
 %
-%       gitclone("https://github.com/arussian00/starship-simple-controls-playback.git");
-%       cd starship-simple-controls-playback
+%       addpath(pwd)
+%       rehash
+%       clear functions
 %       run_playback
 %
 %   The Starship trajectory is matlab-rocket-sim with ideal steering on the
 %   ascent and that sim's own return controller. boosterPitchTVC is simulated
-%   along the ascent only. Its gimbal is not fed back into the flight.
+%   along the ascent only. Its gimbal is not fed back into the flight. If
+%   the controller cannot be built or simulated, the flight animation still
+%   plays and the window says controller unavailable.
 %
 %   Assign the output if you want the histories:
 %       out = run_playback(1, false);
+
+% pwd's directory cache does not notice files !git just wrote. Putting this
+% folder on the search path and rehashing makes the sibling .m files visible.
+here = fileparts(mfilename('fullpath'));
+if isempty(here)
+    here = pwd;
+end
+addpath(here);
+rehash;
 
 if nargin < 1 || isempty(speed)
     speed = 1;
@@ -34,15 +46,21 @@ close all
 paths = setup_paths();
 flight = run_starship_flight();
 
-V = vehicle_params();
-[traj, info] = trajectory_from_sim(flight, V);
-fprintf('Controller inputs from this run (not the controls-repo CSV).\n');
-fprintf('  %s\n', info.reference);
-fprintf('  Wind: %s\n', info.windLabel);
-fprintf('  Ascent schedule: %.0f s, %d samples, peak |pitch - flight path| = %.3f deg\n', ...
-    info.tStop, height(traj), info.peakThetaRefDeg);
-
-pb = run_open_loop_playback(traj, info, V);
+traj = [];
+info = empty_info();
+try
+    V = vehicle_params();
+    [traj, info] = trajectory_from_sim(flight, V);
+    fprintf('Controller inputs from this run (not the controls-repo CSV).\n');
+    fprintf('  %s\n', info.reference);
+    fprintf('  Wind: %s\n', info.windLabel);
+    fprintf('  Ascent schedule: %.0f s, %d samples, peak |pitch - flight path| = %.3f deg\n', ...
+        info.tStop, height(traj), info.peakThetaRefDeg);
+    pb = run_open_loop_playback(traj, info, V);
+catch ME
+    pb = controller_unavailable(ME.message);
+    fprintf('\n%s\n', pb.controllerNote);
+end
 print_playback_summary(flight, pb, info);
 
 result.paths = paths;
@@ -60,13 +78,83 @@ end
 end
 
 
+function info = empty_info()
+info.windLabel = '';
+info.peakThetaRefDeg = NaN;
+info.reference = '';
+info.tStop = NaN;
+end
+
+
+function pb = controller_unavailable(reason)
+reason = flatten_message(reason);
+pb.mode = 'playback';
+pb.openLoop = true;
+pb.unavailable = true;
+pb.controllerNote = ['controller unavailable: ' reason];
+n = 2;
+nanCol = nan(n, 1);
+pb.t = [0; 1];
+pb.thetaCmdDeg = nanCol;
+pb.thetaDeg = nanCol;
+pb.errDeg = nanCol;
+pb.pitchRateDeg = nanCol;
+pb.deltaDeg = nanCol;
+pb.deltaCmdDeg = nanCol;
+pb.rateDeg = nanCol;
+pb.alphaDeg = nanCol;
+pb.qAlpha_kPa_deg = nanCol;
+pb.deltaMaxDeg = 0;
+pb.rateMaxDeg = 0;
+pb.plantWind = 'controller unavailable';
+pb.windLabel = 'controller unavailable';
+pb.reference = '';
+pb.peakThetaRefDeg = NaN;
+pb.scheduledWind = false;
+pb.features.loadRelief = false;
+pb.features.movingCg = false;
+pb.features.slosh = false;
+pb.features.bending = false;
+pb.features.gridFins = false;
+pb.features.monteCarlo = false;
+pb.features.notes = {pb.controllerNote};
+pb.finT = [];
+pb.finDeg = [];
+pb.finSource = '';
+pb.hasFinCommand = false;
+pb.metrics.peakAttErr_deg = NaN;
+pb.metrics.peakGimbal_deg = NaN;
+pb.metrics.peakRate_deg = NaN;
+pb.metrics.tOnAngle_s = NaN;
+pb.metrics.tOnRate_s = NaN;
+pb.metrics.peakAlpha_deg = NaN;
+pb.metrics.peakQAlpha_kPa_deg = NaN;
+end
+
+
+function text = flatten_message(text)
+if ~ischar(text)
+    text = char(text);
+end
+text = strrep(text, sprintf('\n'), ' ');
+text = strrep(text, sprintf('\r'), ' ');
+text = regexprep(text, ' +', ' ');
+text = strtrim(text);
+end
+
+
 function print_playback_summary(flight, pb, info)
 M = pb.metrics;
 catchMiss = flight.metricsB.miss;
 splash = flight.metricsS.miss;
 fprintf('\n================ PLAYBACK (open loop) ================\n');
-fprintf('The Starship trajectory above is the sim, unchanged.\n');
-fprintf('The pitch controller was played back along the ascent and did not fly the vehicle.\n');
+if isfield(pb, 'controllerNote') && ~isempty(pb.controllerNote)
+    fprintf('%s\n', pb.controllerNote);
+    fprintf('The flight animation still runs. The controller did not.\n');
+else
+    fprintf('The Starship trajectory above is the sim, unchanged.\n');
+    fprintf('The pitch controller was played back along the ascent and did not fly the vehicle.\n');
+end
 fprintf('Catch miss distance        : %9.2f m   (sim tower catch)\n', catchMiss);
 fprintf('Splashdown error           : %9.2f m   (sim, vs its splashdown target)\n', splash);
 fprintf('Attitude reference         : sim pitch minus flight-path angle\n');

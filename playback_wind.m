@@ -13,11 +13,25 @@ function [w, label] = playback_wind(V, t)
 %   only inside the pitch playback, so it cannot move the trajectory.
 
 t = t(:);
-if exist('load_relief_wind', 'file') == 2
-    w = load_relief_wind(V, t);
-    w = w(:);
-    label = 'load_relief_wind (shear + 1-cosine gust)';
-    return
+windFields = {'windShear', 'windShearTime', 'windGust', 'windGustStart', 'windGustDur'};
+if exist('load_relief_wind', 'file') == 2 && has_wind_fields(V, windFields)
+    try
+        w = load_relief_wind(V, t);
+        w = w(:);
+        if numel(w) == numel(t) && isnumeric(w)
+            label = 'load_relief_wind (shear + 1-cosine gust)';
+            return
+        end
+        warning('playback_wind:Shape', ...
+            'load_relief_wind did not return one sample per time.');
+    catch ME
+        warning('playback_wind:LoadRelief', ...
+            'load_relief_wind is present but was not used (%s).', ME.message);
+    end
+elseif exist('load_relief_wind', 'file') == 2
+    warning('playback_wind:Fields', ...
+        ['load_relief_wind is on the path; skipped because windShear, ' ...
+         'windShearTime, windGust, windGustStart, or windGustDur is missing.']);
 end
 
 w = zeros(size(t));
@@ -27,5 +41,19 @@ if isfield(V, 'gustTime') && isfield(V, 'gustSpeed')
         V.gustSpeed, V.gustTime);
 else
     label = 'no controls-repo wind model found; wind left at 0';
+end
+end
+
+
+function tf = has_wind_fields(V, names)
+tf = isstruct(V);
+if ~tf
+    return
+end
+for k = 1:numel(names)
+    if ~isfield(V, names{k}) || isempty(V.(names{k}))
+        tf = false;
+        return
+    end
 end
 end

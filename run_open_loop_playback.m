@@ -26,7 +26,7 @@ if nargin < 3 || isempty(V)
     V = vehicle_params();
 end
 
-D = design_pitch_controller(V, plot=false, verbose=false);
+D = design_pitch_controller(V, 'plot', false, 'verbose', false);
 fprintf(['Pitch cascade (playback, not in the flight loop): ' ...
     'Kq = %.4g, Kth = %.4g, KiTh = %.4g, stop %.0f deg, rate %.0f deg/s\n'], ...
     D.Kq, D.Kth, D.KiTh, D.deltaMaxDeg, D.gimbalRateDeg);
@@ -39,15 +39,14 @@ cd(here);
 mdl = build_pitch_model();
 quiet_scopes(mdl);
 
+[ext, traj] = controls_extensions(mdl, V, D, traj);
 t = traj.t_s(:);
 thetaRef = traj.theta_ref_rad(:);
 apply_pitch_condition(D, "liftoff", ...
-    thetaStepDeg=0, gustSpeed=0, gustTime=1e9, ...
-    misalignDeg=0, misalignTime=1e9, tStop=t(end), shapeOn=1);
+    'thetaStepDeg', 0, 'gustSpeed', 0, 'gustTime', 1e9, ...
+    'misalignDeg', 0, 'misalignTime', 1e9, 'tStop', t(end), 'shapeOn', 1);
 push_baseline_schedule(traj, D);
 publish_optional_tables(traj, V);
-
-ext = controls_extensions(mdl, V, D, traj);
 scheduledWind = model_has_block(mdl, 'lookup_wind');
 
 assignin('base', 'playbackThetaCmd', timeseries(thetaRef, t));
@@ -152,17 +151,47 @@ end
 
 
 function push_baseline_schedule(traj, D)
-src = fileread(which('apply_flight_schedule'));
-if contains(src, 'schedWind')
-    apply_flight_schedule(traj, D, useWind=true);
+target = which('apply_flight_schedule');
+if isempty(target)
+    error('run_open_loop_playback:Schedule', ...
+        'apply_flight_schedule is not on the path.');
+end
+src = fileread(target);
+if ~isempty(strfind(src, 'schedWind')) %#ok<STREMP>
+    % Step 3 reads the shear and gust off D. Without those fields the
+    % call stays on the default (zero) wind table.
+    if has_wind_fields(D)
+        apply_flight_schedule(traj, D, 'useWind', true);
+    else
+        apply_flight_schedule(traj, D);
+    end
 else
     apply_flight_schedule(traj, D.deltaMax);
 end
 end
 
 
+function tf = has_wind_fields(D)
+names = {'windShear', 'windShearTime', 'windGust', 'windGustStart', 'windGustDur'};
+tf = isstruct(D);
+if ~tf
+    return
+end
+for k = 1:numel(names)
+    if ~isfield(D, names{k}) || isempty(D.(names{k}))
+        tf = false;
+        return
+    end
+end
+end
+
+
 function publish_optional_tables(traj, V)
-tSched = evalin('base', 'schedTime');
+try
+    tSched = evalin('base', 'schedTime');
+catch
+    return
+end
 tSrc = traj.t_s(:);
 CNa = 2.0;
 area = pi * (4.5 ^ 2);
