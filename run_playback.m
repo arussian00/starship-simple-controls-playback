@@ -42,7 +42,10 @@ if ~(isscalar(speed) && isnumeric(speed) && speed > 0)
 end
 animate = logical(animate);
 
-close all
+% Keep the tagged mission-control window so the next run reuses it.
+% Anything else the controller opened (a scope, a design plot) is closed
+% so playback stays one window.
+present_figure('closeothers');
 paths = setup_paths();
 flight = run_starship_flight();
 
@@ -69,6 +72,7 @@ result.trajectory = traj;
 result.playback = pb;
 result.summary = summary_struct(flight, pb, info);
 
+present_figure('closeothers');
 if animate
     animate_playback(flight, pb, speed);
 end

@@ -13,15 +13,18 @@ run_playback
 
 A `git checkout` or `git pull` done with `!git` writes the new `.m` files from outside MATLAB. The Files panel lists `run_playback.m` immediately. The Command Window keeps the old directory list, so the name is an unrecognized function until `addpath(pwd)` puts this folder on the search path and `rehash` rebuilds that list. `clear functions` drops a copy MATLAB already loaded. Call `run_playback`. Typing `run_playback.m` is not a function call: MATLAB treats the dot as a field and can follow it with `fl:filesystem:SystemError`.
 
-If this folder is still the commit from before that refresh, update the branch first, then run the four lines above:
+This checkout has no local edits. Update it with fetch and a hard reset. `!git pull` on MATLAB Drive has bus-errored and left half-written files; if that happens again, `!git restore --source=HEAD -- .` puts the last good tree back.
 
 ```matlab
-!git pull origin cursor/open-loop-playback-1b14
+!git fetch origin cursor/open-loop-playback-1b14
+!git reset --hard origin/cursor/open-loop-playback-1b14
 addpath(pwd)
 rehash
 clear functions
 run_playback
 ```
+
+The mission-control window is one figure, reused on the next run. It opens maximized (`cfg.figureMode = 'maximized'` in `playback_config.m`) and the panel fonts scale when the window changes size. Set `cfg.figureMode = 'docked'` to dock it in the MATLAB Online desktop instead. The figure background stays white. Graph interiors stay dark, and the axis titles, tick labels, and legends that sit on the white background are near-black. On R2025a and newer the figure `Theme` is set to `'light'` so a dark MATLAB Online desktop does not repaint those colors.
 
 First clone, from `/MATLAB Drive/Repositories`:
 
@@ -82,7 +85,7 @@ Wind is the controls-repo model, applied only inside the pitch playback. On main
 
 ## Mission-control layout
 
-One figure named `Starship mission control - PLAYBACK (open loop)`. It opens maximized. Axes use normalized positions, so resizing the window resizes the panels. Columns match `animateStarship`:
+One figure named `Starship mission control - PLAYBACK (open loop)`, tag `starshipPlayback`. The next run clears that figure instead of opening another. It is created with `WindowState` `'maximized'` (set again after `drawnow`) and `Units` `'normalized'`, `OuterPosition` `[0 0 1 1]` when maximize is not available. `cfg.figureMode = 'docked'` uses `WindowStyle` `'docked'` instead. Axes stay in normalized positions. A `SizeChangedFcn` puts those positions back and scales fonts from a 1500-by-860 design size so the titles do not collide when the window is smaller. Columns match `animateStarship`:
 
 | Column | x | width |
 |---|---|---|
@@ -129,6 +132,8 @@ Each step 3-6 hook runs only when its function is on the path and the field it r
 | `controls_extensions.m` | Hooks for steps 3-6 |
 | `mission_control_layout.m` | Shared panel positions |
 | `animate_playback.m` | The one mission-control window |
+| `present_figure.m` | Maximize or dock that window, reuse it, scale fonts on resize |
+| `playback_theme.m` | White figure, dark plots, black labels outside the plots |
 
 ## Troubleshooting
 

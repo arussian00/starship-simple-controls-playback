@@ -37,6 +37,7 @@ cleanup = onCleanup(@() cd(previous)); %#ok<NASGU>
 cd(here);
 
 mdl = build_pitch_model();
+hide_model(mdl);
 quiet_scopes(mdl);
 
 [ext, traj] = controls_extensions(mdl, V, D, traj);
@@ -82,6 +83,11 @@ fprintf(['Open-loop playback: sim() of %s to t = %.1f s along the ascent. ' ...
     'The controller does not fly the vehicle.\n'], mdl, t(end));
 out = sim(mdl, 'ReturnWorkspaceOutputs', 'on');
 unload_quietly(mdl);
+% Scopes and design plots are not part of the mission-control window.
+try
+    present_figure('closeothers');
+catch
+end
 
 [tLog, theta] = must_log(out, 'theta');
 [~, pitchRate] = must_log(out, 'q');
@@ -232,6 +238,16 @@ function tf = model_has_block(mdl, name)
 found = find_system(mdl, 'LookUnderMasks', 'on', 'FollowLinks', 'on', ...
     'Name', name);
 tf = ~isempty(found);
+end
+
+
+function hide_model(mdl)
+% build_pitch_model calls open_system. Hide that editor so playback does
+% not leave a second window beside mission control.
+try
+    set_param(mdl, 'Open', 'off');
+catch
+end
 end
 
 

@@ -13,6 +13,10 @@ function cfg = playback_config()
 %
 %   cfg.simBranch empty means "use the matlab-rocket-sim checkout already
 %   on disk". setup_paths never commits or pushes either source repo.
+%
+%   cfg.figureMode is 'maximized' or 'docked'. Maximized fills the MATLAB
+%   Online browser area. Docked puts the window in the desktop instead.
+%   The same figure (cfg.figureTag) is cleared and reused on the next run.
 
 cfg.simRepo = 'matlab-rocket-sim';
 cfg.controlsRepo = 'rocket-controls-simulink';
@@ -21,4 +25,6 @@ cfg.controlsUrl = 'https://github.com/arussian00/rocket-controls-simulink.git';
 cfg.simBranch = '';
 cfg.controlsBranch = 'main';
 cfg.driveRoot = '/MATLAB Drive/Repositories';
+cfg.figureMode = 'maximized';
+cfg.figureTag = 'starshipPlayback';
 end

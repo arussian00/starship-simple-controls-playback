@@ -99,31 +99,29 @@ else
     finCmd = [];
 end
 
-%% One window, normalized positions, so it fills the screen and resizes.
+%% One window. Normalized panel positions reflow with the figure.
+% present_figure reuses the tagged window, maximizes it (or docks it),
+% and sets OuterPosition [0 0 1 1] when WindowState is not available.
 banner = L.indicatorPlayback;
 if isfield(pb, 'controllerNote') && ~isempty(pb.controllerNote)
     banner = [L.indicatorPlayback ' - ' pb.controllerNote];
 end
-fig = figure('Name', [L.figureName ' - ' banner], ...
-    'Color', 'w', 'NumberTitle', 'off', ...
-    'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
-try
-    set(fig, 'WindowState', 'maximized');
-catch
-end
+fig = present_figure('obtain', [L.figureName ' - ' banner]);
+T = playback_theme();
 try
     annotation(fig, 'textbox', [0.12 0.945 0.76 0.045], ...
         'String', banner, ...
         'EdgeColor', 'none', 'HorizontalAlignment', 'center', ...
         'VerticalAlignment', 'middle', 'FontWeight', 'bold', ...
-        'FontSize', 11, 'Color', L.color.banner, ...
-        'BackgroundColor', [1 0.95 0.90], 'FaceAlpha', 0.9, ...
+        'FontSize', T.fontBanner, 'Color', T.text, ...
+        'BackgroundColor', T.bannerBack, 'FaceAlpha', 0.9, ...
         'Interpreter', 'none');
 catch
     annotation(fig, 'textbox', [0.12 0.945 0.76 0.045], ...
         'String', banner, ...
         'EdgeColor', 'none', 'HorizontalAlignment', 'center', ...
-        'FontWeight', 'bold', 'FontSize', 11, 'Color', L.color.banner, ...
+        'FontWeight', 'bold', 'FontSize', T.fontBanner, 'Color', T.text, ...
+        'BackgroundColor', T.bannerBack, ...
         'Interpreter', 'none');
 end
 
@@ -143,12 +141,14 @@ hDtS = plot(axO, nan, nan, 'o', 'Color', L.color.ship, ...
 plot(axO, xPad / 1e3, 0, 'k^', 'MarkerFaceColor', [1 0.8 0], 'MarkerSize', 7);
 xlabel(axO, 'Downrange [km]');
 ylabel(axO, 'Altitude [km]');
-legend(axO, [hTrB hTrS], {'Super Heavy', 'Starship'}, 'Location', 'northwest', ...
-    'AutoUpdate', 'off', 'FontSize', 7);
-hClock = title(axO, '', 'FontName', 'Monospaced', 'FontSize', 9);
-hLog = text(axO, 0.98, 0.97, '', 'Units', 'normalized', 'FontSize', 7, ...
-    'HorizontalAlignment', 'right', 'VerticalAlignment', 'top', ...
+legO = legend(axO, [hTrB hTrS], {'Super Heavy', 'Starship'}, 'Location', 'northwest', ...
+    'AutoUpdate', 'off', 'FontSize', T.fontSmall);
+style_legend(legO, T);
+hClock = title(axO, '', 'FontName', 'Monospaced', 'FontSize', T.fontTitle);
+hLog = text(axO, 0.98, 0.97, '', 'Units', 'normalized', 'FontSize', T.fontSmall, ...
+    'Color', T.inPlot, 'HorizontalAlignment', 'right', 'VerticalAlignment', 'top', ...
     'FontName', 'Monospaced');
+playback_theme('graph', axO);
 
 hold(axE, 'on');
 axis(axE, 'equal');
@@ -168,6 +168,7 @@ axis(axE, [-R R -R R]);
 title(axE, 'Earth view (dotted: 100 km)');
 xlabel(axE, 'km');
 ylabel(axE, 'km');
+playback_theme('overlay', axE);
 
 W = 100;
 gB = build_camera(axB, Pb, Ps, xPad, 'Super Heavy camera');
@@ -207,8 +208,9 @@ plain(axC{1});
 title(axC{1}, sprintf('Attitude [deg]   peak |error| %.3f', M.peakAttErr_deg), ...
     'Interpreter', 'none');
 xlabel(axC{1}, 'Time [min]');
-legend(axC{1}, [hC.cmd hC.resp hC.err], {'command', 'response', 'error'}, ...
-    'Location', 'best', 'FontSize', 7);
+legC = legend(axC{1}, [hC.cmd hC.resp hC.err], {'command', 'response', 'error'}, ...
+    'Location', 'best', 'FontSize', T.fontSmall);
+style_legend(legC, T);
 
 axC{2} = axes('Parent', fig, 'Position', panel_pos(L, 'controls', 2));
 yyaxis(axC{2}, 'left');
@@ -257,7 +259,8 @@ else
     hC.finCmd = [];
     finTitle = 'Grid fins (sim return; no controller yet)';
     text(axC{4}, 0.02, 0.95, 'controls model has no grid-fin loop', ...
-        'Units', 'normalized', 'FontSize', 7, 'VerticalAlignment', 'top');
+        'Units', 'normalized', 'FontSize', T.fontSmall, 'Color', T.inPlot, ...
+        'VerticalAlignment', 'top');
 end
 plain(axC{4});
 title(axC{4}, finTitle, 'Interpreter', 'none');
@@ -268,7 +271,13 @@ for j = 1:4
     plain(axC{j});
 end
 
+% Fonts are the design size for a full window. The resize callback scales
+% them, and reapplies these normalized positions, when the window changes.
+present_figure('arm', fig);
+present_figure('raise', fig);
+
 %% Play
+raised = false;
 for k = 1:numel(tf)
     if ~ishghandle(fig)
         return
@@ -324,10 +333,12 @@ for k = 1:numel(tf)
         else
             str = hud_text('STARSHIP', Sh.phaseList{s.ph(k)}, s, k, tk > tSep);
         end
+        % Info text sits on the camera scene. Light type on the dark sky,
+        % near-black type when the sky is still the daytime blue.
         if sky > 0.5
-            hc = 'w';
+            hc = T.inPlot;
         else
-            hc = 'k';
+            hc = T.text;
         end
         set(g.hud, 'String', str, 'Color', hc);
     end
@@ -354,6 +365,11 @@ for k = 1:numel(tf)
         xlim(axC{j}, xl);
     end
     drawnow
+    if ~raised
+        % MATLAB Online applies maximized only after the window has been drawn.
+        present_figure('raise', fig);
+        raised = true;
+    end
 end
 end
 
@@ -365,10 +381,35 @@ end
 
 
 function plain(ax)
-set(ax, 'FontSize', 8);
+T = playback_theme();
+set(ax, 'FontSize', T.fontAxes);
 grid(ax, 'on');
 try
     set(ax, 'Toolbar', []);
+catch
+end
+playback_theme('graph', ax);
+end
+
+
+function style_legend(leg, T)
+if isempty(leg) || ~ishghandle(leg)
+    return
+end
+try
+    set(leg, 'TextColor', T.text);
+catch
+end
+try
+    set(leg, 'Color', T.legendBack);
+catch
+end
+try
+    set(leg, 'EdgeColor', T.text);
+catch
+end
+try
+    set(leg, 'FontSize', T.fontSmall);
 catch
 end
 end
@@ -476,11 +517,13 @@ patch(ax, xT + [0 8 8 0], [0 0 hArms + 25 hArms + 25], [0.3 0.3 0.33], 'EdgeColo
 plot(ax, [xPad - Pb.diam / 2 - 3, xT], [hArms hArms], 'Color', [0.2 0.2 0.22], 'LineWidth', 4);
 g.booster = vehicle_shapes(ax, 'booster', Pb);
 g.ship = vehicle_shapes(ax, 'ship', Ps);
+T = playback_theme();
 g.hud = text(ax, 0.02, 0.98, '', 'Units', 'normalized', 'FontName', 'Monospaced', ...
-    'FontSize', 8, 'VerticalAlignment', 'top');
+    'FontSize', T.fontHud, 'Color', T.inPlot, 'VerticalAlignment', 'top');
 xlabel(ax, 'Downrange [m]');
 ylabel(ax, 'Altitude [m]');
 title(ax, ttl);
+playback_theme('overlay', ax);
 end
 
 
