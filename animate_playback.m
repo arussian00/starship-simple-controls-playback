@@ -113,14 +113,14 @@ try
         'String', banner, ...
         'EdgeColor', 'none', 'HorizontalAlignment', 'center', ...
         'VerticalAlignment', 'middle', 'FontWeight', 'bold', ...
-        'FontSize', T.fontBanner, 'Color', T.text, ...
+        'FontSize', T.fontBanner, 'Color', T.inPlot, ...
         'BackgroundColor', T.bannerBack, 'FaceAlpha', 0.9, ...
         'Interpreter', 'none');
 catch
     annotation(fig, 'textbox', [0.12 0.945 0.76 0.045], ...
         'String', banner, ...
         'EdgeColor', 'none', 'HorizontalAlignment', 'center', ...
-        'FontWeight', 'bold', 'FontSize', T.fontBanner, 'Color', T.text, ...
+        'FontWeight', 'bold', 'FontSize', T.fontBanner, 'Color', T.inPlot, ...
         'BackgroundColor', T.bannerBack, ...
         'Interpreter', 'none');
 end
@@ -168,7 +168,7 @@ axis(axE, [-R R -R R]);
 title(axE, 'Earth view (dotted: 100 km)');
 xlabel(axE, 'km');
 ylabel(axE, 'km');
-playback_theme('overlay', axE);
+playback_theme('graph', axE);
 
 W = 100;
 gB = build_camera(axB, Pb, Ps, xPad, 'Super Heavy camera');
@@ -333,14 +333,8 @@ for k = 1:numel(tf)
         else
             str = hud_text('STARSHIP', Sh.phaseList{s.ph(k)}, s, k, tk > tSep);
         end
-        % Info text sits on the camera scene. Light type on the dark sky,
-        % near-black type when the sky is still the daytime blue.
-        if sky > 0.5
-            hc = T.inPlot;
-        else
-            hc = T.text;
-        end
-        set(g.hud, 'String', str, 'Color', hc);
+        % Live readout stays near-white (#F0F0F0) on every frame.
+        set(g.hud, 'String', str, 'Color', T.inPlot);
     end
 
     tm = tf(1:k) / 60;
@@ -364,11 +358,16 @@ for k = 1:numel(tf)
     for j = 1:4
         xlim(axC{j}, xl);
     end
+    % Limits and the sky update can clear the ink. Paint, draw, paint again.
+    playback_theme('reinforce', fig);
     drawnow
     if ~raised
         % MATLAB Online applies maximized only after the window has been drawn.
         present_figure('raise', fig);
         raised = true;
+    end
+    if ishghandle(fig)
+        playback_theme('reinforce', fig);
     end
 end
 end
@@ -393,6 +392,8 @@ end
 
 
 function style_legend(leg, T)
+% TextColor, box Color, EdgeColor, and font stay on the legend palette.
+% playback_theme's reinforce walk does not visit legend objects.
 if isempty(leg) || ~ishghandle(leg)
     return
 end
