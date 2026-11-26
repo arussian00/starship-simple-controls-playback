@@ -34,17 +34,18 @@ if nargin < 2 || isempty(tag)
 end
 name = char(name);
 mode = playback_figure_mode();
+pal = playback_theme();
 fig = find_tagged(tag);
 if isempty(fig)
     fig = figure('Name', name, 'Tag', tag, 'NumberTitle', 'off', ...
-        'Color', 'w', 'Visible', 'on');
+        'Color', pal.figure, 'Visible', 'on');
 else
     safe_set(fig, 'SizeChangedFcn', '');
     safe_set(fig, 'ResizeFcn', '');
     figure(fig);
     clf(fig);
     safe_set(fig, 'Name', name, 'Tag', tag, 'NumberTitle', 'off', ...
-        'Color', 'w', 'Visible', 'on');
+        'Color', pal.figure, 'Visible', 'on');
     setappdata(fig, 'PlaybackReflowing', false);
 end
 playback_theme('figure', fig);
@@ -70,6 +71,7 @@ if ~is_figure(fig)
 end
 drawnow;
 apply_mode(fig, playback_figure_mode());
+playback_theme('reinforce', fig);
 end
 
 

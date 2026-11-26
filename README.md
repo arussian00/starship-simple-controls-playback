@@ -24,7 +24,7 @@ clear functions
 run_playback
 ```
 
-The mission-control window is one figure, reused on the next run. It opens maximized (`cfg.figureMode = 'maximized'` in `playback_config.m`) and the panel fonts scale when the window changes size. Set `cfg.figureMode = 'docked'` to dock it in the MATLAB Online desktop instead. The figure background stays white. Graph interiors stay dark, and the axis titles, tick labels, and legends that sit on the white background are near-black. On R2025a and newer the figure `Theme` is set to `'light'` so a dark MATLAB Online desktop does not repaint those colors.
+The mission-control window is one figure, reused on the next run. It opens maximized (`cfg.figureMode = 'maximized'` in `playback_config.m`) and the panel fonts scale when the window changes size. Set `cfg.figureMode = 'docked'` to dock it in the MATLAB Online desktop instead. The figure background and the graph interiors stay dark. Grid lines stay grey. Each string is white or black against the surface it sits on, so the WCAG contrast ratio is at least 4.5: titles and tick numbers sit on the dark figure, a camera readout sits on that frame's sky, and a light control or the light banner gets black type. Legends keep their existing text color, box color, edge color, and font. `check_theme_contrast` asserts the ratio for every text object. On R2025a and newer the figure `Theme` is set to `'light'` so a dark MATLAB Online desktop does not restyle the window; `playback_theme('reinforce')` puts the colors back after a resize and after every animation frame.
 
 First clone, from `/MATLAB Drive/Repositories`:
 
@@ -133,7 +133,8 @@ Each step 3-6 hook runs only when its function is on the path and the field it r
 | `mission_control_layout.m` | Shared panel positions |
 | `animate_playback.m` | The one mission-control window |
 | `present_figure.m` | Maximize or dock that window, reuse it, scale fonts on resize |
-| `playback_theme.m` | White figure, dark plots, black labels outside the plots |
+| `playback_theme.m` | Dark figure, text colored for contrast, legends left as they are |
+| `check_theme_contrast.m` | Assert a WCAG ratio of at least 4.5 for every text object |
 
 ## Troubleshooting
 
